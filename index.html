@@ -82,6 +82,44 @@
     }
     .card h3 { margin: 0 0 0.5rem 0; font-size: 1.15rem; }
     .card p { font-size: 0.9rem; color: #64748b; line-height: 1.5; margin: 0; }
+
+    .form-container {
+      background: white;
+      padding: 1.5rem;
+      margin-top: 2rem;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .form-container label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 0.3rem;
+      color: #475569;
+    }
+    .form-input {
+      margin-bottom: 1rem;
+      padding: 0.6rem 0.8rem;
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 0.95rem;
+    }
+    .btn-export {
+      background: #0f766e;
+      color: white;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+    .btn-export:hover {
+      background: #0d655e;
+    }
   </style>
 </head>
 <body>
@@ -92,23 +130,45 @@
   </header>
 
   <div class="container">
+    <!-- 搜尋區塊 -->
     <div class="search-section">
       <input type="text" id="searchInput" class="search-input" placeholder="搜尋核銷項目或關鍵字...">
     </div>
 
+    <!-- 卡片展示區 -->
     <div id="cardGrid" class="grid">
       <!-- 卡片內容將由 JavaScript 動態渲染 -->
     </div>
+
+    <!-- 自動生成 Word 表單區塊 -->
+    <div class="form-container">
+      <h3>📝 自動生成核銷請款單 (Word)</h3>
+      
+      <label for="applicantName">申請人姓名：</label>
+      <input type="text" id="applicantName" class="form-input" placeholder="例如：黃楚涵">
+
+      <label for="reimburseItem">報支項目：</label>
+      <input type="text" id="reimburseItem" class="form-input" placeholder="例如：講座鐘點費">
+
+      <label for="amount">報支金額：</label>
+      <input type="number" id="amount" class="form-input" placeholder="例如：2000">
+
+      <button onclick="generateWord()" class="btn-export">
+        ⬇️ 匯出 Word 請款單
+      </button>
+    </div>
   </div>
 
-  <!-- 引入您儲存庫中的 JS 檔（若有） -->
+  <!-- 引入 JS 套件 -->
   <script src="gemini-code-1789643855044.js"></script>
+  <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
   <script>
     let rawData = [];
 
-    // 自動讀取同目錄下的 JSON 資料檔
-    fetch('gemini-code-1789643855044.json')
+    // 自動讀取同目錄下的 JSON 資料檔 (根據您儲存庫上的真實檔名)
+    fetch('gemini-code-17896438552185.json')
       .then(response => response.json())
       .then(data => {
         rawData = data;
@@ -151,6 +211,84 @@
       });
       renderCards(filtered);
     });
+
+    // 生成並下載 Word 文件 (.docx)
+    function generateWord() {
+      const name = document.getElementById('applicantName').value || '未填寫';
+      const item = document.getElementById('reimburseItem').value || '未填寫';
+      const amount = document.getElementById('amount').value || '0';
+
+      const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType } = docx;
+
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({ text: "經費核銷請款單", bold: true, size: 36, color: "0f766e" }),
+              ],
+              alignment: AlignmentType.CENTER,
+              space: { after: 400 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: `填表日期：${new Date().toLocaleDateString('zh-TW')}`, size: 22, color: "64748b" }),
+              ],
+              alignment: AlignmentType.RIGHT,
+              space: { after: 200 }
+            }),
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      width: { size: 30, type: WidthType.PERCENTAGE },
+                      children: [new Paragraph({ children: [new TextRun({ text: "申請人姓名", bold: true })] })]
+                    }),
+                    new TableCell({
+                      width: { size: 70, type: WidthType.PERCENTAGE },
+                      children: [new Paragraph(name)]
+                    }),
+                  ],
+                }),
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({ children: [new TextRun({ text: "報支項目", bold: true })] })]
+                    }),
+                    new TableCell({
+                      children: [new Paragraph(item)]
+                    }),
+                  ],
+                }),
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({ children: [new TextRun({ text: "報支總金額", bold: true })] })]
+                    }),
+                    new TableCell({
+                      children: [new Paragraph(`NT$ ${Number(amount).toLocaleString()}`)]
+                    }),
+                  ],
+                }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "\n備註：請檢附相關憑證與單據送至出納/會計單位辦理核銷。", italic: true, size: 20, color: "94a3b8" }),
+              ],
+              space: { before: 300 }
+            })
+          ],
+        }],
+      });
+
+      Packer.toBlob(doc).then(blob => {
+        saveAs(blob, `核銷請款單_${name}.docx`);
+      });
+    }
   </script>
 </body>
 </html>
